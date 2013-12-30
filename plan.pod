@@ -1,0 +1,140 @@
+=head1 a perl interface for IDA
+
+Author: Willem Jan Hengeveld itsme@xs4all.nl
+
+IDA, the Interactive Disassembler by datarescuee, see http://www.hex-rays.com/idapro/
+can be scripted in IDC, a scripting language with C like syntax.
+
+also there are a ruby, and a python scripting extension.
+ * http://d-dome.net/idapython
+ * http://www.wasm.ru/pub/23/files/perl_src.zip
+     by redplait, not updated since 2004, for perl5.5, ida4.7
+ * http://www.metasploit.com/users/spoonm/idarub/idarub-0.8.zip
+
+this extension is loosely based on VIM's perl scripting extension: if_perl.xs
+
+=head2 what can you do with this plugin
+
+this plugin does several things:
+=item provide an environment to execute perl code, which can interact with IDA
+
+=item *TODO* manage key bindings
+
+=head3 several ways to execute scripts
+
+=item *DONE* snippet implicitly wrapped in for loop
+    use IDC;
+    for (local $_=(SelBegin()!=BADADDR)?SelBegin():ScreenEA() ; 
+                  (SelEnd()!=BADADDR)?$_<SelEnd():$_==ScreenEA() ; 
+               $_=(SelEnd()!=BADADDR)?NextHead($_, SelEnd()):BADADDR)
+    {
+        # CODE
+    }
+ * add options to script ui, to add/remove wrappers, like the above selection wrapper,
+   or turn on/off 'use strict', etc.
+
+=item plain code
+
+=item *TODO* externally
+
+it should also be possible to run perl scripts from the commandline,
+which then find the correct IDA instance, and interact with it.
+
+probably the best way to identify which ida instance to talk to, is by .idb file, and then find which 
+idag.exe has it open.
+
+but if there is only one idag running, just take that instance.
+
+something like this:
+ use IDA remote=>'test.idb';
+
+
+=head3 *DONE* script manager
+
+there will be a script manager to make it easier to have several pieces of code easy to access
+ * keeps a history of code snippets in the .idb
+
+=item *DONE* select code snippet from drop downlist
+=item *DONE* add code snippet to list for later use
+
+=item *TODO* map a key to a code snippet
+
+there is no user interface to do this, but AddHotKey also works for perlcode.
+
+=item autorun items
+
+which always run depending on specific contexts.
+like:
+ * at application start
+ * embedded in a .idb
+
+note, that loader or processor specific scripts can be executed by hooking
+IDP events.
+
+=item *TODO* hook notification points
+    kernwin.hpp : ui_notification_t
+    dbg.hpp     : dbg_event_code_t
+    idp.hpp     : event_code_t 
+    idp.hpp     : idp_notify 
+    intel.hpp   : event_codes_t 
+    graph.hpp   : graph_notification_t 
+    dbg.hpp     : dbg_notification_t 
+
+=item *TODO* create perl objects for ida items, like functions, segments, structs, etc.
+
+=item *TODO* build library of idaperl modules under idadir\plugins\idaperl
+ 
+=item *TODO* add 'ctrl-c' support
+
+several possibilities:
+ * run perl code in seperate thread, the main idathread only has a dialogbox with a 'cancel' button.
+ * check if there is some ida-ui event that can be used to call a perl function, aborting the interpreter
+ * run perl in the main thread, and the dialog box in a seperate thread.
+
+main problem seems to be interrupting perl.
+  'kill' kills the whole process.
+  'threads->kill' in a thread kills only that thread.
+
+some idea's:
+
+$SIG{'KILL'}= sub { die "script killed\n"; }
+
+-- idathread:dialog, perlthread:exec
+'die "script killed"'  from the idathread -> crash ( recursive exceptions called )
+
+
+=item *TODO* add option to convert .idc code to .pl
+
+=item *TODO* find way of moving data from a cloned interpreter, back to the parent.
+
+=item *TODO* implement 'locals' to import registers and local vars during debugging,
+      using get_reg_val, get_name_value, get_stkvar
+
+=item *TODO* implement 'for_not_func(sub { MakeFunction(@_); Wait(); })'
+
+=item *TODO* ida5.4: see kernwin.hpp, add cli_t support, install_command_interpreter
+
+=item *TODO* for the cli_t / expression eval, make sure 'use IDC' is always executed.  ( for debugger breakpoints conditions )
+
+=head2 fixed
+ *0.2 implement all remaining idc functions
+ *0.3 fix memleaks
+ *0.4 implement some way of redirecting perl stdout/stderr to the ida message window
+ *0.4 better error reporting ( perl syntax errors used to disapear into the void )
+ *0.4 added idaperl to several IDA menu's + a options dialog.
+ *0.4 fixed problem with passing regex match values to idc functions.
+ *0.4 autorun items
+ *0.4 added option to choose whether to keep the interpreter, or reset it after each executed script
+
+ *0.5 implemented method of interrupting long running script
+ *0.5 added support for ida script extension, to be able to eval any ida data
+      field using perl.
+
+      
+
+**bug: error reading 0x4710000 + 0x62a18
+-> need to 
+memdump -n idag.exe -o 0x4710000 0x80000
+(4710000 = base of idaperl )
+
+-> this is &(cli_t->sname)

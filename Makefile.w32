@@ -1,0 +1,166 @@
+#
+# (C) 2008 Willem Hengeveld  itsme@xs4all.nl
+#
+# IdcPerl - a perl scripting plugin for the Interactive Disassembler by hex-rays.
+# see http://www.xs4all.nl/~itsme/projects/idcperl
+#
+# makefile for idcperl
+#
+# change these paths to match your local install dirs.
+#
+idasdk=z:/plain/bin/ida/idasdk
+idabin=c:/local/ida600
+PERL=c:/local/perl510
+
+IDAPERLVERSION=0.6
+
+OUTDIR=obj
+IDAPERL=$(OUTDIR)/idaperl-$(IDAPERLVERSION).plw
+# load dll dynamically
+# NOTE that non-dynamic loading currently does not work.
+DYNAMIC_PERL=yes
+# Perl version, in the form 55 (5.005), 56 (5.6.x), etc]
+PERL_VER = 510
+
+DEBUG=yes
+#CFLAGS+=-DTRACE_XS -DTRACE_MAGIC -DTRACE_INTERP
+#CFLAGS+=-DTRACE_LANG -DTRACE_INTERP -DTRACE_DLL  -DTRACE_PLUGIN
+
+PERL_INCDIR = $(PERL)/Lib/Core
+
+PERL_DLL = perl$(PERL_VER).dll
+PERL_LIB = $(PERL_INCDIR)/perl$(PERL_VER).lib
+
+CFLAGS+=-DWINVER=0x0400 -D_WIN32_WINNT=0x0400
+#CFLAGS+=-D_PERL_THREADS 
+#LDLIBS+=-libpath:$(BOOST)/lib-x86
+
+CFLAGS+=-I $(BOOST)
+
+# to prevent stdio redef, either define
+#   USE_STANDARD_FILE_FUNCTIONS  - for idasdk fpro.h
+#   WIN32IO_IS_STDIO             - for perlsdk win32iop.h
+CFLAGS+=-DUSE_STANDARD_FILE_FUNCTIONS
+CFLAGS+=-DWIN32IO_IS_STDIO
+# prevent perlsdk:handy.h to redef bool
+CFLAGS+=-DHAS_BOOL
+
+
+# this prevents idasdk/include/pro.h and fpro.h to redef stdio funcs as 'dont_use'
+#CFLAGS+=-DUSE_STANDARD_FILE_FUNCTIONS
+#CFLAGS+=-DUSE_DANGEROUS_FUNCTIONS
+
+NOWARN=-wd4619 -wd4514 -wd4710 -wd4244 -wd4242 -wd4127 -wd4668 -wd4146 -wd4820 -wd4217 -wd4511 -wd4512 -wd4201
+# prevent 'snprintf' redefined ( idasdk\pro.h and perlsdk\win32.h )
+NOWARN+=-wd4005
+# prevent signed/unsigned mismatch in qstring ( kernwin.hpp )
+NOWARN+=-wd4245
+ 
+# defs for ida
+CDEFS=-DWIN32 -D_USRDLL -D__NT__ -D__IDP__ -DMAXSTR=1024
+# defs for vs2005 sdk
+CDEFS+=-D_SCL_SECURE_NO_WARNINGS -D_SECURE_SCL=0 -D_CRT_SECURE_NO_WARNINGS
+CINCS=-I $(idasdk)/include
+COPTS=-EHsc -GR -nologo
+
+LDLIBS+=-libpath:$(idasdk)/lib/vc.w32  $(idasdk)/lib/vc.w32/ida.lib
+LDFLAGS=-nologo -dll -export:PLUGIN
+
+# for cancel button, registry, file funcs
+LDLIBS+=user32.lib advapi32.lib shlwapi.lib
+#CDEFS+=-D_WITH_CANCEL
+
+ifeq ($(DEBUG),yes)
+COPTS+=-Zi
+LDFLAGS+= -debug
+else
+COPTS+=-O2
+endif
+
+ifeq ($(DYNAMIC_PERL),yes)
+CFLAGS+=-DDYNAMIC_PERL -DDYNAMIC_PERL_DLL=\"$(PERL_DLL)\" -DIDAPERL_VERSION=\"$(IDAPERLVERSION)\"
+PERL_LIB=
+endif
+
+PERL_EXE = $(PERL)/Bin/perl
+PERL_INC = -I $(PERL_INCDIR)
+
+XSUBPP = $(PERL)/lib/ExtUtils/xsubpp
+XSUBPP_TYPEMAP = $(PERL)/lib/ExtUtils/typemap
+
+vc=c:/Program Files/Microsoft Visual Studio 8/VC
+
+CC=$(vc)/bin/cl.exe
+LD=$(vc)/bin/link.exe
+LDFLAGS+=-libpath:"$(vc)/lib"
+LDFLAGS+=-libpath:"$(vc)/platformsdk/lib"
+CFLAGS+=-I "$(vc)/include"
+CFLAGS+=-I "$(vc)/platformsdk/include"
+
+OBJLIST=idc_perl.obj pluginreg.obj perlinterp.obj perl_magic.obj iolayer.obj idchotkey.obj langreg.obj clireg.obj cv_sv2idc.obj
+ifeq ($(DYNAMIC_PERL),yes)
+OBJLIST+=perldll.obj
+endif
+all: $(IDAPERL)
+
+$(IDAPERL): $(OUTDIR) $(addprefix $(OUTDIR)/,$(OBJLIST))
+	@"$(LD)" $(LDFLAGS) $(LDLIBS) $(addprefix $(OUTDIR)/,$(OBJLIST)) $(PERL_LIB) -out:$@
+
+$(OUTDIR):
+	mkdir -p $(OUTDIR)
+
+perldllprocnames.inc redefperlasdll.h: perldllprocs.h
+	perl gendllcode.pl perldllprocs.h perldllprocnames.inc redefperlasdll.h
+idc_perl.cpp : idc_perl.xs typemap
+	@$(PERL_EXE) $(XSUBPP) -C++ -csuffix .cpp -prototypes -typemap $(XSUBPP_TYPEMAP) -typemap typemap idc_perl.xs > idc_perl.cpp
+
+perldll.cpp: perldllprocnames.inc
+perldll.cpp: redefperlasdll.h
+idc_perl.xs: redefperlasdll.h
+perl_magic.cpp: redefperlasdll.h
+perlinterp.cpp: redefperlasdll.h
+pluginreg.cpp: redefperlasdll.h
+idchotkey.cpp: redefperlasdll.h
+iolayer.cpp: redefperlasdll.h
+
+$(OUTDIR)/%.obj: %.cpp
+	@"$(CC)" $(CFLAGS) $(PERL_INC) -c -W4 $(NOWARN) $(COPTS) $(CINCS) $(CDEFS) -Fo$@ $^
+
+install: $(IDAPERL)
+	@cp $< $(idabin)/plugins
+#ifeq ($(DEBUG),yes)
+#	@cp $(basename $(IDAPERL)).pdb $(idabin)/plugins
+#endif
+	@mkdir -p $(idabin)/perl/IDC
+	@cp $(wildcard *.pm) $(idabin)/perl/
+	@cp $(wildcard IDC/*.pm) $(idabin)/perl/IDC/
+
+test: install
+	$(idabin)/idag.exe $(OUTDIR)/idc_perl.obj
+dumpidb:
+	perl -I ../idbutil ../idbutil/tstidb.pl $(OUTDIR)/idc_perl.idb
+
+clean:
+	@$(RM) $(wildcard perldllprocnames.inc redefperlasdll.h idc_perl.cpp vc80.pdb) $(wildcard $(addprefix $(OUTDIR)/*.,ilk lib obj pdb plw exp id0 id1 nam til idb)) 
+	@$(RM) -r $(OUTDIR)/perl/
+
+devenv: install
+	devenv /debugexe $(idabin)/idag.exe $(OUTDIR)/idc_perl.obj
+
+TIMESTAMP=$(shell date +%Y%m%d%H%M)
+SRCPATH=$(abspath .)
+zip: install
+	@cd $(idabin) ; \
+	zip -r $(SRCPATH)/$(notdir $(basename $(IDAPERL)))-$(TIMESTAMP).zip plugins/$(notdir $(IDAPERL)) perl
+
+SVNURL=$(shell grep svn+ssh .svn/entries|head -1)
+svnzip:
+	$(RM) -r idaperl-src-$(TIMESTAMP)
+	svn cp $(SVNURL) idaperl-src-$(TIMESTAMP)
+	zip -r -x .svn -X $(SRCPATH)/$(notdir $(basename $(IDAPERL)))-src-$(TIMESTAMP).zip idaperl-src-$(TIMESTAMP)
+	$(RM) -r idaperl-src-$(TIMESTAMP)
+
+SVNDIR=idcperl5
+srczip:
+	cd .. ; svn ls $(SVNDIR) | sed "s/^/$(SVNDIR)\//" | xargs zip $(SVNDIR)/$(notdir $(basename $(IDAPERL)))-src-$(TIMESTAMP).zip
+

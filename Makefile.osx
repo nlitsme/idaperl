@@ -1,0 +1,134 @@
+#
+# (C) 2008 Willem Hengeveld  itsme@xs4all.nl
+#
+# IdcPerl - a perl scripting plugin for the Interactive Disassembler by hex-rays.
+# see http://www.xs4all.nl/~itsme/projects/idcperl
+#
+# makefile for idcperl
+#
+# change these paths to match your local install dirs.
+#
+#g++ -g -D__MAC__ -fvisibility=hidden  -I/Users/itsme/bin/idaadv/idasdk/include/ -DNO_OBSOLETE_FUNCS  -D__IDP__ -D__PLUGIN__ -c -ogetlines.o32 getlines.cpp
+#g++ -D__MAC__ -fvisibility=hidden -dynamiclib -current_version 1.0 -compatibility_version 1.0 -dead_strip -single_module -flat_namespace -o /Users/itsme/bin/idaadv/idasdk/bin/plugins/getlines.pmc getlines.o32                 -L/Users/itsme/bin/idaadv/idasdk/bin/ -lida  
+include ../idacfg.mk
+
+PERL=/System/Library/Perl/5.12
+PERL_EXE = /usr/bin/perl5.12
+
+#PERL=/System/Library/Perl/5.8.9
+#PERL_EXE = /usr/bin/perl5.8.9
+
+# note: comment out I_MALLOCMALLOC in CORE/config.h to avoid a name collission for processor_t
+# note: crashing in a mutex lock
+#PERL=/opt/local/lib/perl5/5.12.3
+#PERL_EXE = /opt/local/bin/perl5.12.3
+
+
+#PERL=/opt/local/lib/perl5/5.14.2
+#PERL_EXE=/opt/local/bin/perl5.14
+
+IDAPERLVERSION=0.6
+
+OUTDIR=obj
+IDAPERL=$(OUTDIR)/idaperl.pmc
+# load dll dynamically
+# NOTE that non-dynamic loading currently does not work.
+#DYNAMIC_PERL=yes
+# Perl version, in the form 55 (5.005), 56 (5.6.x), etc]
+PERL_VER = 512
+O=.o
+
+DEBUG=yes
+
+PERL_INCDIR = $(wildcard $(PERL)/darwin-*/CORE)
+
+PERL_DLL = libperl.dylib
+PERL_LIB = $(PERL_INCDIR)/libperl.dylib
+
+
+# to prevent stdio redef, either define
+#   USE_STANDARD_FILE_FUNCTIONS  - for idasdk fpro.h
+#   WIN32IO_IS_STDIO             - for perlsdk win32iop.h
+CFLAGS+=-DUSE_STANDARD_FILE_FUNCTIONS -DUSE_DANGEROUS_FUNCTIONS
+
+#CFLAGS+=-DWIN32IO_IS_STDIO
+# prevent perlsdk:handy.h to redef bool
+CFLAGS+=-DHAS_BOOL
+
+CFLAGS+=-DTRACE_XS -DTRACE_MAGIC -DTRACE_HOTKEY -DTRACE_CLI
+CFLAGS+=-DTRACE_LANG -DTRACE_INTERP -DTRACE_DLL  -DTRACE_PLUGIN
+
+# no position independent code -> to quickly get the thunk code working
+#CFLAGS+=-fNOPIC
+
+
+# this prevents idasdk/include/pro.h and fpro.h to redef stdio funcs as 'dont_use'
+#CFLAGS+=-DUSE_STANDARD_FILE_FUNCTIONS
+#CFLAGS+=-DUSE_DANGEROUS_FUNCTIONS
+
+# defs for ida
+CDEFS= -D__MAC__ -D__IDP__ -DMAXSTR=1024 -D__PLUGIN__  -m32  -D_MALLOC_MALLOC_H_
+# -DNO_OBSOLETE_FUNCS - todo: find out what this does.
+# defs for vs2005 sdk
+CINCS=-I $(idasdk)/include -I /opt/local/include
+COPTS=-fvisibility=hidden
+CDEFS+=-DIDAPERL_VERSION=\"$(IDAPERLVERSION)\"
+
+#LDLIBS=-L $(idabin) -lida
+LDLIBS=$(idabin)/libida.dylib
+LDFLAGS=-dynamiclib -m32
+#-current_version 1.0 -compatibility_version 1.0  -single_module -flat_namespace
+
+ifeq ($(DEBUG),yes)
+COPTS+=-g
+LDFLAGS+=  -g
+else
+COPTS+=-O2
+endif
+
+ifeq ($(DYNAMIC_PERL),yes)
+CFLAGS+=-DDYNAMIC_PERL -DDYNAMIC_PERL_DLL=\"$(PERL_DLL)\"
+PERL_LIB=
+endif
+
+PERL_INC = -I $(PERL_INCDIR)
+
+XSUBPP = $(PERL)/ExtUtils/xsubpp
+XSUBPP_TYPEMAP = $(PERL)/ExtUtils/typemap
+
+CC=clang++
+LD=clang++
+
+OBJLIST=$(addprefix $(OUTDIR)/,idc_perl$(O) pluginreg$(O) perlinterp$(O) perl_magic$(O) idchotkey$(O) iolayer$(O) langreg$(O) cv_sv2idc$(O) clireg$(O))
+ifeq ($(DYNAMIC_PERL),yes)
+OBJLIST+=$(OUTDIR)/perldll$(O)
+endif
+
+all: $(IDAPERL)
+
+$(IDAPERL): $(OUTDIR) $(OBJLIST)
+	$(LD) $(LDFLAGS) "$(LDLIBS)" $(OBJLIST) $(PERL_LIB) -o $@
+
+$(OUTDIR):
+	mkdir -p $(OUTDIR)
+
+idc_perl.cpp : idc_perl.xs typemap
+	$(PERL_EXE) $(XSUBPP) -C++ -csuffix .cpp -prototypes -typemap $(XSUBPP_TYPEMAP) -typemap typemap idc_perl.xs > idc_perl.cpp
+
+$(OUTDIR)/%$(O): %.cpp
+	$(CC) $(CFLAGS) $(PERL_INC) -c -Wall  $(COPTS) $(CINCS) $(CDEFS) -o $@ $^
+
+install: $(IDAPERL)
+	@cp $< "$(idabin)/plugins"
+	@mkdir -p "$(idabin)/perl/IDC"
+	@cp $(wildcard *.pm) "$(idabin)/perl/"
+	@cp $(wildcard IDC/*.pm) "$(idabin)/perl/IDC/"
+
+test: install
+	"$(idabin)/idal" $(OUTDIR)/idc_perl$(O)
+
+clean:
+	$(RM) $(wildcard idc_perl.cpp) $(wildcard $(addprefix $(OUTDIR)/*.,o pmc id0 id1 nam til idb))
+
+devenv: install
+	gdb "$(idabin)/idal"

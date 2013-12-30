@@ -1,0 +1,51 @@
+use IDC;
+use strict;
+use warnings;
+
+Message(join("\n", map { sprintf("%-20s : %s", $_, $IDC::{$_}) } grep { /key/i } keys %IDC::));
+Message(join("\n", map { sprintf("%-20s : %s", $_, $::{$_}) } grep { /key/i } keys %::));
+
+
+AddHotkey("Shift-I", "test123");
+DelHotkey("Shift-H");
+Message(sprintf("13:b:%d\n", GetCharPrm(13)));
+Message(sprintf("25:w:%d\n", GetShortPrm(25)));
+Message(sprintf("35:d:%d\n", GetLongPrm(35)));
+SetCharPrm(13, 99);
+SetShortPrm(25, 99);
+SetLongPrm(35, 99);
+Message(sprintf("13:b:%d\n", GetCharPrm(13)));
+Message(sprintf("25:w:%d\n", GetShortPrm(25)));
+Message(sprintf("35:d:%d\n", GetLongPrm(35)));
+Message(MK_FP(123, 456));
+AddCodeXref(123, 0, 1);
+DelCodeXref(123, 0, 0);
+add_dref(123, 0, 1);
+del_dref(123, 0);
+Message(sprintf("df:%08lx\n", Dfirst(0x245c)));
+
+Message(sprintf("db:%08lx, d:%08lx\n", DfirstB(0x1c0), Dfirst(0x1c0)));
+Message(sprintf("f:%08lx n:%08lx\n", DfirstB(0x1c0), DnextB(0x1c0, 0x248c)));
+
+my $e0= ScreenEA();
+Message("Dfirst/Dnext: ");
+for (my $ea= Dfirst($e0) ; $ea!=-1 ; $ea= Dnext($e0, $ea)) { Message(sprintf(" %08lx:%d", $ea, XrefType())); } Message("\n");
+Message("DfirstB/DnextB: ");
+for (my $ea= DfirstB($e0) ; $ea!=-1 ; $ea= DnextB($e0, $ea)) { Message(sprintf(" %08lx:%d", $ea, XrefType())); } Message("\n");
+Message("Rfirst/Rnext: ");
+for (my $ea= Rfirst($e0) ; $ea!=-1 ; $ea= Rnext($e0, $ea)) { Message(sprintf(" %08lx:%d", $ea, XrefType())); } Message("\n");
+Message("RfirstB/RnextB: ");
+for (my $ea= RfirstB($e0) ; $ea!=-1 ; $ea= RnextB($e0, $ea)) { Message(sprintf(" %08lx:%d", $ea, XrefType())); } Message("\n");
+Message("Rfirst0/Rnext0: ");
+for (my $ea= Rfirst0($e0) ; $ea!=-1 ; $ea= Rnext0($e0, $ea)) { Message(sprintf(" %08lx:%d", $ea, XrefType())); } Message("\n");
+Message("RfirstB0/RnextB0: ");
+for (my $ea= RfirstB0($e0) ; $ea!=-1 ; $ea= RnextB0($e0, $ea)) { Message(sprintf(" %08lx:%d", $ea, XrefType())); } Message("\n");
+
+my $id = AddStrucEx(-1,"struc_FILETIME",0);
+AddStrucMember($id,"ftLow", 0,  0x20000400,     -1,     4);
+AddStrucMember($id,"ftHigh",4,  0x20000400,     -1,     4);
+
+sub test123 { Message("test123 called\n"); }
+DelHotkey("Shift-I");
+AddHotkey("Shift-I", "test123");
+

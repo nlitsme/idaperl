@@ -1,0 +1,23 @@
+=== version 0.1
+ * first version, subset of idc implemented
+
+=== version 0.2
+ * simplified idc api implementation, now calling ida's internal functions
+   so complete IDC api is now implemented
+
+=== version 0.3
+ * fixed memleak
+
+=== version 0.4
+ * now printing to STDOUT, and STDERR ( using 'print', warn, etc. ) is redirected to the ida message log
+ * optionally support perl threads, by serializing access to ida.
+ * added 'run perl file', 'reset perl', 'about', 'options' menu entries
+ * implemented autorun
+ * added options dialog
+ * optionally using new interpreter for each manually entered perl script.
+ * IDA.pm, containing some iteration helpers.
+
+ * bugfix: idc function calls no longer destroy regex results like '$1'
+ * bugfix: now syntax errors are displayed correctly
+
+
