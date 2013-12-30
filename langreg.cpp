@@ -220,7 +220,6 @@ void register_language()
 }
 void deregister_language()
 {
-    delete extlang;
     remove_extlang(&g_el);
 
     destroyclone(dbginterp);

@@ -6,28 +6,19 @@
 #
 # makefile for idcperl
 #
-# change these paths to match your local install dirs.
-#
-#g++ -g -D__MAC__ -fvisibility=hidden  -I/Users/itsme/bin/idaadv/idasdk/include/ -DNO_OBSOLETE_FUNCS  -D__IDP__ -D__PLUGIN__ -c -ogetlines.o32 getlines.cpp
-#g++ -D__MAC__ -fvisibility=hidden -dynamiclib -current_version 1.0 -compatibility_version 1.0 -dead_strip -single_module -flat_namespace -o /Users/itsme/bin/idaadv/idasdk/bin/plugins/getlines.pmc getlines.o32                 -L/Users/itsme/bin/idaadv/idasdk/bin/ -lida  
 include ../idacfg.mk
 
-PERL=/System/Library/Perl/5.12
-PERL_EXE = /usr/bin/perl5.12
+idasdk?=~/sources/idasdk65
+idabin?=/Applications/IDA Pro 6.5/idaq.app/Contents/MacOS
 
-#PERL=/System/Library/Perl/5.8.9
-#PERL_EXE = /usr/bin/perl5.8.9
+PERL=/System/Library/Perl/5.16
+PERL_EXE = /usr/bin/perl5.16
 
 # note: comment out I_MALLOCMALLOC in CORE/config.h to avoid a name collission for processor_t
 # note: crashing in a mutex lock
-#PERL=/opt/local/lib/perl5/5.12.3
-#PERL_EXE = /opt/local/bin/perl5.12.3
 
 
-#PERL=/opt/local/lib/perl5/5.14.2
-#PERL_EXE=/opt/local/bin/perl5.14
-
-IDAPERLVERSION=0.6
+IDAPERLVERSION=0.7
 
 OUTDIR=obj
 IDAPERL=$(OUTDIR)/idaperl.pmc
@@ -35,7 +26,7 @@ IDAPERL=$(OUTDIR)/idaperl.pmc
 # NOTE that non-dynamic loading currently does not work.
 #DYNAMIC_PERL=yes
 # Perl version, in the form 55 (5.005), 56 (5.6.x), etc]
-PERL_VER = 512
+PERL_VER = 516
 O=.o
 
 DEBUG=yes
@@ -55,8 +46,9 @@ CFLAGS+=-DUSE_STANDARD_FILE_FUNCTIONS -DUSE_DANGEROUS_FUNCTIONS
 # prevent perlsdk:handy.h to redef bool
 CFLAGS+=-DHAS_BOOL
 
-CFLAGS+=-DTRACE_XS -DTRACE_MAGIC -DTRACE_HOTKEY -DTRACE_CLI
-CFLAGS+=-DTRACE_LANG -DTRACE_INTERP -DTRACE_DLL  -DTRACE_PLUGIN
+#  set various idaperl debugging flags
+#CFLAGS+=-DTRACE_XS -DTRACE_MAGIC -DTRACE_HOTKEY -DTRACE_CLI
+#CFLAGS+=-DTRACE_LANG -DTRACE_INTERP -DTRACE_DLL  -DTRACE_PLUGIN
 
 # no position independent code -> to quickly get the thunk code working
 #CFLAGS+=-fNOPIC
@@ -82,6 +74,7 @@ LDFLAGS=-dynamiclib -m32
 ifeq ($(DEBUG),yes)
 COPTS+=-g
 LDFLAGS+=  -g
+COPTS+=-O0
 else
 COPTS+=-O2
 endif
